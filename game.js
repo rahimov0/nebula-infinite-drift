@@ -146,6 +146,70 @@ class Bullet {
     }
 }
 
+class FloatingText {
+    constructor() { this.active = false; }
+    reset(x, y, text, color) {
+        this.x = x; this.y = y; this.text = text; this.color = color;
+        this.life = 60; this.maxLife = 60; this.active = true;
+    }
+    update() {
+        if (!this.active) return;
+        this.y -= 2; this.life--;
+        if (this.life <= 0) this.active = false;
+    }
+    draw(ctx) {
+        if (!this.active) return;
+        ctx.save();
+        ctx.globalAlpha = this.life / this.maxLife;
+        ctx.fillStyle = this.color;
+        ctx.font = 'bold 20px "Outfit", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.shadowBlur = 10; ctx.shadowColor = this.color;
+        ctx.fillText(this.text, this.x, this.y);
+        ctx.restore();
+    }
+}
+
+class EnemyShip extends GameObject {
+    constructor() { super(); this.radius = 35; } 
+    reset(x, y) {
+        super.reset(x, y);
+        this.hp = 2;
+        this.startX = x;
+        this.lastFireTime = Date.now() + Math.random() * 1000;
+    }
+    update(speed) {
+        if (!this.active) return;
+        this.y += speed * 0.4;
+        this.x = this.startX + Math.sin(this.y * 0.015) * 80;
+        if (this.y > window.innerHeight + 100) this.active = false;
+    }
+    draw(ctx) {
+        if (!this.active) return;
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(Math.PI);
+        ctx.shadowBlur = 20; ctx.shadowColor = '#ff004c';
+        ctx.drawImage(ASSETS.ship, -40, -40, 80, 80);
+        ctx.restore();
+    }
+}
+
+class EnemyBullet extends Bullet {
+    update() {
+        this.y += CONFIG.BULLET_SPEED * 0.6;
+        if (this.y > window.innerHeight + 50) this.active = false;
+    }
+    draw(ctx) {
+        if (!this.active) return;
+        ctx.save(); ctx.shadowBlur = 15; ctx.shadowColor = '#ff004c';
+        ctx.translate(this.x, this.y);
+        ctx.rotate(Math.PI);
+        ctx.drawImage(ASSETS.bullet, -15, -15, 30, 30);
+        ctx.restore();
+    }
+}
+
 // --- Entities ---
 class GameObject {
     constructor() { this.active = false; this.x = 0; this.y = 0; this.radius = 0; }
@@ -199,13 +263,14 @@ class Player {
     constructor(canvas) {
         this.canvas = canvas;
         this.x = canvas.width / 2;
-        this.y = canvas.height - 150;
+        this.y = canvas.height - 250;
         this.targetX = this.x;
         this.radius = 25;
         this.hp = CONFIG.MAX_HP;
         this.ammo = 0;
         this.isGhost = false; this.isShielded = false; this.isTurbo = false;
         this.lastFireTime = 0;
+        this.isFiring = false;
     }
     update(controlMode, moveState) {
         if (controlMode === 'DRAG') {
@@ -245,6 +310,9 @@ class GameEngine {
         this.bullets = [];
         this.stars = [];
         this.particles = new ParticleSystem();
+        this.floatingTexts = Array.from({ length: 20 }, () => new FloatingText());
+        this.enemies = Array.from({ length: 5 }, () => new EnemyShip());
+        this.enemyBullets = Array.from({ length: 30 }, () => new EnemyBullet());
         
         this.score = 0;
         this.gameSpeed = CONFIG.BASE_SPEED;
@@ -310,34 +378,47 @@ class GameEngine {
         
         const L = document.getElementById('left-btn');
         const R = document.getElementById('right-btn');
+        const F = document.getElementById('fire-btn');
 
         L.onmousedown = L.ontouchstart = (e) => { e.preventDefault(); setMove('left', true); };
         R.onmousedown = R.ontouchstart = (e) => { e.preventDefault(); setMove('right', true); };
+        F.onmousedown = F.ontouchstart = (e) => { e.preventDefault(); if (this.player) this.player.isFiring = true; };
         
         window.onmouseup = window.ontouchend = window.ontouchcancel = () => {
             this.moveState.left = false;
             this.moveState.right = false;
+            if (this.player) this.player.isFiring = false;
         };
 
         // Keyboard Support
         window.addEventListener('keydown', (e) => {
             if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') this.togglePause();
-            if (this.state === 'PLAYING' && this.controlMode === 'BUTTONS') {
-                if (e.key === 'ArrowLeft') this.moveState.left = true;
-                if (e.key === 'ArrowRight') this.moveState.right = true;
+            if (this.state === 'PLAYING') {
+                if (e.code === 'Space') { e.preventDefault(); if (this.player) this.player.isFiring = true; }
+                if (this.controlMode === 'BUTTONS') {
+                    if (e.key === 'ArrowLeft') this.moveState.left = true;
+                    if (e.key === 'ArrowRight') this.moveState.right = true;
+                }
             }
         });
         window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') { if (this.player) this.player.isFiring = false; }
             if (e.key === 'ArrowLeft') this.moveState.left = false;
             if (e.key === 'ArrowRight') this.moveState.right = false;
         });
+    }
+
+    updateControlsVisibility() {
+        const isPlaying = this.state === 'PLAYING';
+        document.getElementById('mobile-controls').classList.toggle('hidden', !isPlaying || this.controlMode === 'DRAG');
+        document.getElementById('action-controls').classList.toggle('hidden', !isPlaying);
     }
 
     setControlMode(mode) {
         this.controlMode = mode;
         document.getElementById('mode-drag').classList.toggle('active', mode === 'DRAG');
         document.getElementById('mode-buttons').classList.toggle('active', mode === 'BUTTONS');
-        document.getElementById('mobile-controls').classList.toggle('hidden', mode === 'DRAG');
+        this.updateControlsVisibility();
     }
 
     showSettings(show) {
@@ -352,6 +433,7 @@ class GameEngine {
             this.state = 'PLAYING';
             document.getElementById('pause-overlay').classList.remove('active');
         }
+        this.updateControlsVisibility();
     }
 
     exitToMenu() {
@@ -359,6 +441,7 @@ class GameEngine {
         document.querySelectorAll('.overlay').forEach(o => o.classList.remove('active'));
         document.getElementById('menu-overlay').classList.add('active');
         this.updateHUD();
+        this.updateControlsVisibility();
     }
 
     start() {
@@ -368,9 +451,13 @@ class GameEngine {
         this.asteroids.forEach(a => a.active = false);
         this.powerups.forEach(p => p.active = false);
         this.bullets.forEach(b => b.active = false);
+        this.enemies.forEach(e => e.active = false);
+        this.enemyBullets.forEach(eb => eb.active = false);
+        this.floatingTexts.forEach(ft => ft.active = false);
         this.state = 'PLAYING';
         document.querySelectorAll('.overlay').forEach(o => o.classList.remove('active'));
         this.updateHUD();
+        this.updateControlsVisibility();
         if (!this.loopStarted) { this.loopStarted = true; this.gameLoop(); }
     }
 
@@ -383,6 +470,12 @@ class GameEngine {
         document.getElementById('game-over-overlay').classList.add('active');
         document.getElementById('final-score').innerText = Math.floor(this.score);
         this.particles.spawn(this.player.x, this.player.y, 50, '#ff004c');
+        this.updateControlsVisibility();
+    }
+
+    spawnText(x, y, text, color) {
+        const t = this.floatingTexts.find(tf => !tf.active);
+        if (t) t.reset(x, y, text, color);
     }
 
     spawnEntities() {
@@ -391,7 +484,10 @@ class GameEngine {
         if (now - this.lastSpawnTime > interval) {
             this.lastSpawnTime = now;
             const rand = Math.random();
-            if (rand < 0.2) {
+            if (this.score > 5000 && rand < 0.15) {
+                const e = this.enemies.find(en => !en.active);
+                if (e) e.reset(Math.random() * (this.canvas.width - 200) + 100, -100);
+            } else if (rand < 0.35) {
                 const pool = this.powerups.find(p => !p.active);
                 if (pool) {
                     const types = ['crystal', 'crystal', 'repair', 'shield', 'turbo', 'ammo'];
@@ -405,7 +501,7 @@ class GameEngine {
     }
 
     shoot() {
-        if (this.player.ammo > 0 && Date.now() - this.player.lastFireTime > CONFIG.FIRE_RATE) {
+        if (this.player.isFiring && this.player.ammo > 0 && Date.now() - this.player.lastFireTime > CONFIG.FIRE_RATE) {
             const b = this.bullets.find(b => !b.active);
             if (b) {
                 b.reset(this.player.x, this.player.y - 40);
@@ -439,13 +535,53 @@ class GameEngine {
                 a.active = false; this.updateHUD();
             }
         });
+
+        this.enemies.forEach(e => {
+            if (!e.active) return;
+            this.bullets.forEach(b => {
+                if (b.active && distance(b.x, b.y, e.x, e.y) < b.radius + e.radius) {
+                    e.hp--; b.active = false;
+                    this.particles.spawn(b.x, b.y, 10, '#ff004c');
+                    if (e.hp <= 0) {
+                        e.active = false; this.score += 500;
+                        this.particles.spawn(e.x, e.y, 30, '#ff004c');
+                        this.spawnText(e.x, e.y, "+500", "#ff004c");
+                    }
+                }
+            });
+            if (distance(p.x, p.y, e.x, e.y) < p.radius + e.radius) {
+                e.active = false;
+                this.particles.spawn(e.x, e.y, 30, '#ff004c');
+                if (!p.isGhost && !p.isShielded && !p.isTurbo) {
+                    this.player.hp -= 40; this.particles.spawn(p.x, p.y, 30, '#ff004c');
+                    this.spawnText(p.x, p.y, "-40 HP", "#ff004c");
+                    if (this.player.hp <= 0) this.gameOver();
+                    else { p.isGhost = true; setTimeout(() => p.isGhost = false, 1500); }
+                } else { this.particles.spawn(p.x, p.y, 10, '#00f2ff'); }
+                this.updateHUD();
+            }
+        });
+
+        this.enemyBullets.forEach(eb => {
+            if (eb.active && distance(p.x, p.y, eb.x, eb.y) < p.radius + eb.radius) {
+                eb.active = false;
+                if (!p.isGhost && !p.isShielded && !p.isTurbo) {
+                    this.player.hp -= 15; this.particles.spawn(p.x, p.y, 20, '#ff004c');
+                    this.spawnText(p.x, p.y, "-15 HP", "#ff004c");
+                    if (this.player.hp <= 0) this.gameOver();
+                    else { p.isGhost = true; setTimeout(() => p.isGhost = false, 1500); }
+                } else { this.particles.spawn(p.x, p.y, 10, '#00f2ff'); }
+                this.updateHUD();
+            }
+        });
+
         this.powerups.forEach(pu => {
             if (pu.active && distance(p.x, p.y, pu.x, pu.y) < p.radius + pu.radius) {
-                if (pu.type === 'crystal') this.score += 100;
-                else if (pu.type === 'repair') p.hp = Math.min(100, p.hp + 20);
-                else if (pu.type === 'ammo') p.ammo += 10;
-                else if (pu.type === 'shield') { p.isShielded = true; setTimeout(() => p.isShielded = false, 5000); }
-                else if (pu.type === 'turbo') { p.isTurbo = true; setTimeout(() => p.isTurbo = false, 3000); }
+                if (pu.type === 'crystal') { this.score += 100; this.spawnText(pu.x, pu.y, "+100 Puan", '#00f2ff'); }
+                else if (pu.type === 'repair') { p.hp = Math.min(CONFIG.MAX_HP, p.hp + 50); this.spawnText(pu.x, pu.y, "+50 Can", '#00ff88'); }
+                else if (pu.type === 'ammo') { p.ammo += 20; this.spawnText(pu.x, pu.y, "+20 Mermi", '#ff5e00'); }
+                else if (pu.type === 'shield') { p.isShielded = true; setTimeout(() => p.isShielded = false, 5000); this.spawnText(pu.x, pu.y, "Kalkan!", '#ff00ea'); }
+                else if (pu.type === 'turbo') { p.isTurbo = true; setTimeout(() => p.isTurbo = false, 3000); this.spawnText(pu.x, pu.y, "Hız!", '#ffbd00'); }
                 pu.active = false; this.particles.spawn(pu.x, pu.y, 15, '#fff'); this.updateHUD();
             }
         });
@@ -468,6 +604,10 @@ class GameEngine {
 
         this.ctx.fillStyle = '#05050a'; this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
+        if (this.state === 'PLAYING') {
+            this.gameSpeed = CONFIG.BASE_SPEED + (this.score * 0.0003);
+        }
+
         const speed = (this.player?.isTurbo ? this.gameSpeed * 3 : this.gameSpeed);
         this.bgY += speed * 0.1; if (this.bgY >= this.canvas.height) this.bgY = 0;
         this.ctx.globalAlpha = 0.5;
@@ -489,6 +629,17 @@ class GameEngine {
             this.asteroids.forEach(a => a.update(speed));
             this.powerups.forEach(p => p.update(speed));
             this.bullets.forEach(b => { if (b.active) b.update(); });
+            
+            this.enemies.forEach(e => {
+                e.update(speed);
+                if (e.active && Date.now() - e.lastFireTime > 1500) {
+                    const b = this.enemyBullets.find(eb => !eb.active);
+                    if (b) { b.reset(e.x, e.y + 40); e.lastFireTime = Date.now(); }
+                }
+            });
+            this.enemyBullets.forEach(b => { if (b.active) b.update(); });
+            this.floatingTexts.forEach(t => t.update());
+            
             this.particles.update();
             this.particles.spawnTrail(this.player.x, this.player.y + 30, this.player.isTurbo ? '#ffbd00' : '#00f2ff');
             this.checkCollisions();
@@ -497,7 +648,10 @@ class GameEngine {
         this.asteroids.forEach(a => a.draw(this.ctx));
         this.powerups.forEach(p => p.draw(this.ctx));
         this.bullets.forEach(b => b.draw(this.ctx));
+        this.enemies.forEach(e => e.draw(this.ctx));
+        this.enemyBullets.forEach(b => b.draw(this.ctx));
         this.particles.draw(this.ctx);
+        this.floatingTexts.forEach(t => t.draw(this.ctx));
         if (this.player) this.player.draw(this.ctx);
 
         requestAnimationFrame(() => this.gameLoop());
