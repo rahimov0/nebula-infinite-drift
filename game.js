@@ -41,13 +41,27 @@ const totalAssets = Object.keys(ASSETS).length;
 function loadAssets(callback) {
     const assetKeys = Object.keys(ASSETS);
     let loadedCount = 0;
+    let callbackFired = false;
+    
+    // Safety fallback: force start if assets take too long or events fail to fire
+    const fallbackTimer = setTimeout(() => {
+        if (!callbackFired) {
+            callbackFired = true;
+            console.warn("Asset load timeout. Forcing start...");
+            callback();
+        }
+    }, 2500);
     
     assetKeys.forEach(key => {
         const tempImg = new Image();
         
         const checkDone = () => {
             loadedCount++;
-            if (loadedCount === totalAssets) callback();
+            if (loadedCount === totalAssets && !callbackFired) {
+                clearTimeout(fallbackTimer);
+                callbackFired = true;
+                callback();
+            }
         };
 
         if (key === 'bg') {
