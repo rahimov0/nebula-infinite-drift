@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Nebula: Infinite Drift | Arcade Space Runner</title>
+    <meta name="description" content="Experience the ultimate endless space runner. Dodge asteroids, collect crystals, and survive the nebula drift in Nebula 2.0.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <div id="vignette"></div>
+        <div id="scanlines"></div>
+        <canvas id="gameCanvas"></canvas>
+        
+        <!-- HUD -->
+        <div id="hud">
+            <!-- HUD -->
+            <div id="score-board" class="glass">
+                <div class="score-label">SCORE</div>
+                <div id="score-value">00000</div>
+                <div class="best-score">BEST: <span id="best-score-game">00000</span></div>
+            </div>
+
+            <div id="health-board" class="glass">
+                <div id="health-bar"><div id="health-bar-fill"></div></div>
+                <div id="hp-text">100 HP</div>
+            </div>
+
+            <div class="ammo-display glass neon-text" id="ammo-hud">
+                <span>AMMO:</span> <span id="ammo-count">0</span>
+            </div>
+
+            <button id="pause-btn" class="hud-btn" style="position: absolute; top: 20px; right: 20px; z-index: 100;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+            </button>
+        </div>
+
+        <!-- Mobile Controls -->
+        <div id="mobile-controls" class="hidden">
+            <button id="left-btn" class="ctrl-btn">◀</button>
+            <button id="right-btn" class="ctrl-btn">▶</button>
+        </div>
+
+        <!-- Main Menu Overlay -->
+        <div id="menu-overlay" class="overlay active">
+            <div class="content glass">
+                <h1 class="neon-text">NEBULA</h1>
+                <p class="subtitle">INFINITE DRIFT</p>
+                <div class="best-score" style="margin-bottom: 20px;">BEST SCORE: <span id="best-score-menu">00000</span></div>
+                <button id="start-btn" class="glow-btn hidden">LAUNCH MISSION</button>
+                <button id="settings-btn" class="glow-btn btn-secondary" style="margin-top: 10px;">SETTINGS</button>
+            </div>
+        </div>
+
+        <!-- Pause Overlay -->
+        <div id="pause-overlay" class="overlay">
+            <div class="content glass">
+                <h2 class="neon-text">PAUSED</h2>
+                <div class="btn-row">
+                    <button id="resume-btn" class="glow-btn">RESUME</button>
+                </div>
+                <div class="btn-row" style="margin-top: 10px;">
+                    <button id="quit-btn" class="glow-btn btn-secondary">EXIT TO MENU</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Overlay -->
+        <div id="settings-overlay" class="overlay">
+            <div class="content glass">
+                <h2 class="neon-text">SETTINGS</h2>
+                <div class="settings-group">
+                    <label>CONTROL MODE</label>
+                    <div class="toggle-group">
+                        <button id="mode-drag" class="toggle-btn active">DRAG</button>
+                        <button id="mode-buttons" class="toggle-btn">BUTTONS</button>
+                    </div>
+                </div>
+                <button id="close-settings" class="glow-btn">BACK</button>
+            </div>
+        </div>
+
+        <!-- Game Over Overlay -->
+        <div id="game-over-overlay" class="overlay">
+            <div class="content glass">
+                <h2 class="neon-text-red">MISSION FAILED</h2>
+                <div class="final-stats">
+                    <p>Final Score: <span id="final-score">0</span></p>
+                </div>
+                <button id="restart-btn" class="glow-btn">RETRY</button>
+                <button id="menu-back-btn" class="glow-btn btn-secondary" style="margin-top: 10px;">MAIN MENU</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="game.js?v=2.1.0"></script>
+</body>
+</html>

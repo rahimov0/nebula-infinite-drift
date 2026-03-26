@@ -1,0 +1,347 @@
+:root {
+    --primary-neon: #00f2ff;
+    --secondary-neon: #ff00ea;
+    --danger-neon: #ff004c;
+    --bg-dark: #05050a;
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --font-main: 'Outfit', sans-serif;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body, html {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: var(--bg-dark);
+    font-family: var(--font-main);
+    color: white;
+    touch-action: none;
+}
+
+#game-container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Cinematic Effects */
+#vignette {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle, transparent 50%, rgba(0,0,0,0.6) 100%);
+    pointer-events: none;
+    z-index: 5;
+}
+
+#scanlines {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.04), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.04));
+    background-size: 100% 4px, 3px 100%;
+    pointer-events: none;
+    z-index: 6;
+    opacity: 0.3;
+}
+
+canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* Glassmorphism Utility */
+.glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+/* HUD Styling */
+#hud {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    right: 20px;
+    display: flex;
+    justify-content: space-between;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.hud-item {
+    padding: 10px 15px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 100px;
+}
+
+.label {
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+    opacity: 0.7;
+    margin-bottom: 2px;
+}
+
+#score-value {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--primary-neon);
+    text-shadow: 0 0 10px var(--primary-neon);
+}
+
+#health-container {
+    align-items: flex-end;
+}
+
+#health-bar-bg {
+    width: 120px;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 5px;
+}
+
+#health-bar-fill {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-neon), #00ff88);
+    transition: width 0.3s ease;
+    box-shadow: 0 0 10px var(--primary-neon);
+}
+
+#hp-text {
+    font-size: 0.8rem;
+    font-weight: 400;
+}
+
+/* Overlay Styling */
+.overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.content {
+    padding: 40px;
+    text-align: center;
+    max-width: 90%;
+    width: 320px;
+    transform: scale(0.9);
+    transition: transform 0.4s ease;
+}
+
+.overlay.active .content {
+    transform: scale(1);
+}
+
+h1 {
+    font-size: 3rem;
+    font-weight: 700;
+    letter-spacing: 8px;
+    margin-bottom: 0;
+}
+
+.subtitle {
+    font-size: 0.9rem;
+    letter-spacing: 4px;
+    opacity: 0.6;
+    margin-bottom: 30px;
+}
+
+.neon-text {
+    color: var(--primary-neon);
+    text-shadow: 0 0 20px var(--primary-neon);
+}
+
+.neon-text-red {
+    color: var(--danger-neon);
+    text-shadow: 0 0 20px var(--danger-neon);
+}
+
+.glow-btn {
+    background: transparent;
+    border: 2px solid var(--primary-neon);
+    color: var(--primary-neon);
+    padding: 15px 30px;
+    font-size: 1rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 15px rgba(0, 242, 255, 0.2);
+    margin-top: 20px;
+}
+
+.glow-btn:hover {
+    background: var(--primary-neon);
+    color: var(--bg-dark);
+    box-shadow: 0 0 30px var(--primary-neon);
+}
+
+.controls-hint {
+    margin-top: 30px;
+    font-size: 0.8rem;
+    opacity: 0.5;
+    line-height: 1.6;
+}
+
+.final-stats {
+    margin: 20px 0;
+    font-size: 1.2rem;
+}
+
+/* HUD Updates */
+.hud-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    color: white;
+    cursor: pointer;
+    padding: 10px;
+    backdrop-filter: blur(10px);
+    transition: 0.3s;
+    pointer-events: auto; /* CRITICAL FIX */
+}
+
+.hud-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0 15px var(--primary-neon);
+}
+
+.ammo-display {
+    position: absolute;
+    top: 100px;
+    left: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: bold;
+}
+
+.best-score {
+    font-size: 0.8rem;
+    color: var(--neon-cyan);
+    opacity: 0.8;
+}
+
+/* Mobile Controls */
+#mobile-controls {
+    position: absolute;
+    bottom: 40px;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 30px;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.ctrl-btn {
+    width: 80px;
+    height: 80px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(0, 242, 255, 0.3);
+    border-radius: 50%;
+    color: var(--neon-cyan);
+    font-size: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    backdrop-filter: blur(5px);
+    user-select: none;
+}
+
+.ctrl-btn:active {
+    background: rgba(0, 242, 255, 0.2);
+    transform: scale(0.95);
+}
+
+/* Settings & Overlays */
+.settings-group {
+    margin: 20px 0;
+    text-align: left;
+}
+
+.toggle-group {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.toggle-btn {
+    flex: 1;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.toggle-btn.active {
+    background: var(--neon-cyan);
+    color: var(--dark-bg);
+    box-shadow: 0 0 15px var(--neon-cyan);
+}
+
+.btn-row {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    box-shadow: none !important;
+}
+
+/* Animations */
+@keyframes flicker {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.flicker {
+    animation: flicker 0.1s infinite;
+}
