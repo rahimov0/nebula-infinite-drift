@@ -38,45 +38,54 @@ const ASSETS = {
 let assetsLoaded = 0;
 const totalAssets = Object.keys(ASSETS).length;
 
-function cleanImage(img, callback) {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    img.onload = () => {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
-        for (let i = 0; i < data.length; i += 4) {
-            if (data[i] < 20 && data[i+1] < 20 && data[i+2] < 20) {
-                data[i+3] = 0;
-            }
-        }
-        ctx.putImageData(imageData, 0, 0);
-        const cleanImg = new Image();
-        cleanImg.src = canvas.toDataURL();
-        cleanImg.onload = () => callback(cleanImg);
-    };
-}
-
 function loadAssets(callback) {
     const assetKeys = Object.keys(ASSETS);
     let loadedCount = 0;
+    
     assetKeys.forEach(key => {
         const tempImg = new Image();
-        tempImg.src = `assets/${key}.png`;
+        
+        const checkDone = () => {
+            loadedCount++;
+            if (loadedCount === totalAssets) callback();
+        };
+
         if (key === 'bg') {
-            ASSETS[key] = tempImg;
-            tempImg.onload = () => { loadedCount++; if (loadedCount === totalAssets) callback(); };
-            tempImg.onerror = () => { loadedCount++; if (loadedCount === totalAssets) callback(); };
+            tempImg.onload = () => { ASSETS[key] = tempImg; checkDone(); };
+            tempImg.onerror = () => { checkDone(); };
         } else {
-            cleanImage(tempImg, (cleaned) => {
-                ASSETS[key] = cleaned;
-                loadedCount++;
-                if (loadedCount === totalAssets) callback();
-            });
-            tempImg.onerror = () => { loadedCount++; if (loadedCount === totalAssets) callback(); };
+            tempImg.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = tempImg.width || 80;
+                canvas.height = tempImg.height || 80;
+                if (tempImg.width) {
+                    ctx.drawImage(tempImg, 0, 0);
+                    try {
+                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const data = imageData.data;
+                        for (let i = 0; i < data.length; i += 4) {
+                            if (data[i] < 20 && data[i+1] < 20 && data[i+2] < 20) {
+                                data[i+3] = 0;
+                            }
+                        }
+                        ctx.putImageData(imageData, 0, 0);
+                        const cleanImg = new Image();
+                        cleanImg.onload = () => { ASSETS[key] = cleanImg; checkDone(); };
+                        cleanImg.onerror = () => { ASSETS[key] = tempImg; checkDone(); };
+                        cleanImg.src = canvas.toDataURL();
+                        return;
+                    } catch (e) { 
+                        console.error('Canvas error logic skipped', e); 
+                    }
+                }
+                ASSETS[key] = tempImg;
+                checkDone();
+            };
+            tempImg.onerror = () => { checkDone(); };
         }
+        
+        tempImg.src = `assets/${key}.png`;
     });
 }
 
@@ -333,6 +342,7 @@ class GameEngine {
             this.state = 'MENU';
             document.getElementById('start-btn').classList.remove('hidden');
             this.updateHUD();
+            this.updateControlsVisibility();
         });
     }
 
@@ -410,6 +420,10 @@ class GameEngine {
 
     updateControlsVisibility() {
         const isPlaying = this.state === 'PLAYING';
+        const isPaused = this.state === 'PAUSED';
+        const showHUD = isPlaying || isPaused;
+        
+        document.getElementById('hud').classList.toggle('hidden', !showHUD);
         document.getElementById('mobile-controls').classList.toggle('hidden', !isPlaying || this.controlMode === 'DRAG');
         document.getElementById('action-controls').classList.toggle('hidden', !isPlaying);
     }
