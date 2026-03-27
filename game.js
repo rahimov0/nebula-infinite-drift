@@ -355,9 +355,9 @@ class Asteroid extends GameObject {
     reset(x, y) {
         super.reset(x, y);
         const rand = Math.random();
-        if (rand < 0.33) { this.image = ASSETS.meteor1; this.radius = 25; this.hp = 1; }
-        else if (rand < 0.66) { this.image = ASSETS.meteor2; this.radius = 35; this.hp = 2; }
-        else { this.image = ASSETS.meteor3; this.radius = 18; this.hp = 1; }
+        if (rand < 0.33) { this.image = ASSETS.meteor1; this.radius = 20; this.hp = 1; }
+        else if (rand < 0.66) { this.image = ASSETS.meteor2; this.radius = 28; this.hp = 2; }
+        else { this.image = ASSETS.meteor3; this.radius = 15; this.hp = 1; }
         this.rotation = Math.random() * Math.PI * 2;
         this.rotationSpeed = randomRange(-0.03, 0.03);
     }
@@ -404,8 +404,8 @@ class EnemyShip extends GameObject {
         const now = Date.now();
         
         if (this.phase === 'entering') {
-            this.y += speed * 0.7;
-            this.x = this.startX + Math.sin(this.y * 0.05) * 30;
+            this.y += speed * 0.4;
+            this.x = this.startX + Math.sin((now - this.spawnTime) * 0.001) * 80;
             if (this.y >= this.targetY) {
                 this.y = this.targetY;
                 this.phase = 'fighting';
@@ -429,13 +429,13 @@ class EnemyShip extends GameObject {
         ctx.translate(this.x, this.y);
         ctx.rotate(Math.PI);
         ctx.shadowBlur = 20; ctx.shadowColor = '#ff004c';
-        ctx.drawImage(ASSETS.ship, -30, -30, 60, 60);
+        ctx.drawImage(ASSETS.ship, -25, -25, 50, 50);
         ctx.restore();
     }
 }
 
 class SpaceShuttle extends EnemyShip {
-    constructor() { super(); this.radius = 40; this.fightDuration = 5000; }
+    constructor() { super(); this.radius = 30; this.fightDuration = 5000; }
     reset(x, y) {
         super.reset(x, y);
         this.hp = 10;
@@ -447,7 +447,7 @@ class SpaceShuttle extends EnemyShip {
         ctx.translate(this.x, this.y);
         ctx.rotate(Math.PI);
         ctx.shadowBlur = 30; ctx.shadowColor = '#ff5e00'; // Orange glow
-        ctx.drawImage(ASSETS.ship, -50, -50, 100, 100);
+        ctx.drawImage(ASSETS.ship, -40, -40, 80, 80);
         ctx.restore();
     }
 }
@@ -473,7 +473,7 @@ class Player {
         this.x = canvas.width / 2;
         this.y = canvas.height - 250;
         this.targetX = this.x;
-        this.radius = 18;
+        this.radius = 12;
         this.hp = CONFIG.MAX_HP;
         this.ammo = 0;
         this.isGhost = false; this.isShielded = false; this.isTurbo = false;
@@ -493,12 +493,12 @@ class Player {
         ctx.save();
         if (this.isGhost) ctx.globalAlpha = 0.4 + Math.sin(Date.now() * 0.02) * 0.3;
         if (this.isShielded) {
-            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 20, 0, Math.PI * 2);
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 15, 0, Math.PI * 2);
             ctx.strokeStyle = '#00f2ff'; ctx.lineWidth = 4; ctx.stroke();
         }
         ctx.translate(this.x, this.y);
         ctx.shadowBlur = 20; ctx.shadowColor = this.isTurbo ? '#ffbd00' : '#00f2ff';
-        ctx.drawImage(ASSETS.ship, -30, -30, 60, 60);
+        ctx.drawImage(ASSETS.ship, -20, -20, 40, 40);
         ctx.restore();
     }
 }
@@ -568,13 +568,49 @@ class GameEngine {
     bindEvents() {
         window.addEventListener('resize', () => this.resize());
         
-        const handleInput = (e) => {
+        this.dragTouchId = null;
+
+        this.canvas.addEventListener('touchstart', (e) => {
             if (this.state !== 'PLAYING' || this.controlMode !== 'DRAG') return;
-            const x = e.touches ? e.touches[0].clientX : e.clientX;
-            this.player.targetX = x;
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (this.dragTouchId === null) {
+                    this.dragTouchId = e.changedTouches[i].identifier;
+                    const rect = this.canvas.getBoundingClientRect();
+                    this.player.targetX = e.changedTouches[i].clientX - rect.left;
+                    break;
+                }
+            }
+        }, { passive: false });
+
+        this.canvas.addEventListener('touchmove', (e) => {
+            if (this.state !== 'PLAYING' || this.controlMode !== 'DRAG') return;
+            e.preventDefault(); // Stop scrolling while dragging
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === this.dragTouchId) {
+                    const rect = this.canvas.getBoundingClientRect();
+                    this.player.targetX = e.changedTouches[i].clientX - rect.left;
+                    break;
+                }
+            }
+        }, { passive: false });
+
+        const releaseDrag = (e) => {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === this.dragTouchId) {
+                    this.dragTouchId = null;
+                }
+            }
         };
-        this.canvas.addEventListener('mousemove', handleInput);
-        this.canvas.addEventListener('touchmove', handleInput, { passive: false });
+        this.canvas.addEventListener('touchend', releaseDrag, { passive: false });
+        this.canvas.addEventListener('touchcancel', releaseDrag, { passive: false });
+
+        // Desktop mouse fallback for drag
+        this.canvas.addEventListener('mousemove', (e) => {
+            if (this.state === 'PLAYING' && this.controlMode === 'DRAG') {
+                const rect = this.canvas.getBoundingClientRect();
+                this.player.targetX = e.clientX - rect.left;
+            }
+        });
 
         // HUD & Overlays
         document.getElementById('pause-btn').onclick = (e) => { e.stopPropagation(); this.togglePause(); };
@@ -592,33 +628,51 @@ class GameEngine {
         document.getElementById('mode-buttons').onclick = () => this.setControlMode('BUTTONS');
 
         // Robust Manual Controls
-        const setMove = (dir, state) => { 
-            if (this.controlMode === 'BUTTONS') {
-                this.moveState[dir] = state; 
-                if (this.player) {
-                    this.player.isFiring = (this.moveState.left && this.moveState.right);
-                }
-            } 
-        };
-        
         const L = document.getElementById('left-btn');
         const R = document.getElementById('right-btn');
         const F = document.getElementById('fire-btn');
 
-        L.onmousedown = L.ontouchstart = (e) => { e.preventDefault(); setMove('left', true); };
-        L.onmouseup = L.ontouchend = L.ontouchcancel = (e) => { e.preventDefault(); setMove('left', false); };
-        
-        R.onmousedown = R.ontouchstart = (e) => { e.preventDefault(); setMove('right', true); };
-        R.onmouseup = R.ontouchend = R.ontouchcancel = (e) => { e.preventDefault(); setMove('right', false); };
-        
-        F.onmousedown = F.ontouchstart = (e) => { e.preventDefault(); if (this.player && this.controlMode !== 'BUTTONS') this.player.isFiring = true; };
-        F.onmouseup = F.ontouchend = F.ontouchcancel = (e) => { e.preventDefault(); if (this.player && this.controlMode !== 'BUTTONS') this.player.isFiring = false; };
-        
-        window.onmouseup = window.ontouchcancel = () => {
-            if (this.controlMode === 'DRAG') {
-                if (this.player) this.player.isFiring = false;
+        const checkTouches = (e) => {
+            let l = false, r = false, f = false;
+            for(let i=0; i<e.touches.length; i++) {
+                const t = e.touches[i];
+                const el = document.elementFromPoint(t.clientX, t.clientY);
+                if (el === L || L.contains(el)) l = true;
+                if (el === R || R.contains(el)) r = true;
+                if (el === F || document.getElementById('fire-btn-container').contains(el)) f = true;
+            }
+            this.moveState.left = l; this.moveState.right = r;
+            if (this.player) {
+                if (this.controlMode === 'BUTTONS') {
+                    this.player.isFiring = (l && r);
+                } else {
+                    this.player.isFiring = f;
+                }
             }
         };
+
+        const attachTouch = (btn) => {
+            btn.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); checkTouches(e); }, {passive: false});
+            btn.addEventListener('touchmove', (e) => { e.preventDefault(); e.stopPropagation(); checkTouches(e); }, {passive: false});
+            btn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); checkTouches(e); }, {passive: false});
+            btn.addEventListener('touchcancel', (e) => { e.preventDefault(); e.stopPropagation(); checkTouches(e); }, {passive: false});
+        };
+        attachTouch(L); attachTouch(R); attachTouch(F);
+
+        // Desktop Button Mousedown Fallback
+        L.onmousedown = (e) => { e.preventDefault(); this.moveState.left = true; if(this.controlMode==='BUTTONS' && this.moveState.right && this.player) this.player.isFiring=true; };
+        L.onmouseup = L.onmouseleave = (e) => { this.moveState.left = false; if(this.controlMode==='BUTTONS' && this.player) this.player.isFiring=false; };
+        
+        R.onmousedown = (e) => { e.preventDefault(); this.moveState.right = true; if(this.controlMode==='BUTTONS' && this.moveState.left && this.player) this.player.isFiring=true; };
+        R.onmouseup = R.onmouseleave = (e) => { this.moveState.right = false; if(this.controlMode==='BUTTONS' && this.player) this.player.isFiring=false; };
+        
+        F.onmousedown = (e) => { e.preventDefault(); if (this.controlMode !== 'BUTTONS' && this.player) this.player.isFiring = true; };
+        F.onmouseup = F.onmouseleave = (e) => { if (this.controlMode !== 'BUTTONS' && this.player) this.player.isFiring = false; };
+
+        window.addEventListener('mouseup', () => {
+            this.moveState.left = false; this.moveState.right = false;
+            if (this.player) this.player.isFiring = false;
+        });
 
         // Keyboard Support
         window.addEventListener('keydown', (e) => {
