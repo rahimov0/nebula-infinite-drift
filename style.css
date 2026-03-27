@@ -368,3 +368,14 @@ h1 {
 .flicker {
     animation: flicker 0.1s infinite;
 }
+
+@keyframes float {
+    0% { transform: translateY(0px) rotate(0deg); }
+    50% { transform: translateY(-15px) rotate(2deg); }
+    100% { transform: translateY(0px) rotate(0deg); }
+}
+
+.floating-ship {
+    animation: float 4s ease-in-out infinite;
+    transform-origin: center;
+}

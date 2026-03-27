@@ -54,6 +54,9 @@
         <!-- Main Menu Overlay -->
         <div id="menu-overlay" class="overlay active">
             <div class="content glass">
+                <div class="menu-hero-image" style="margin-bottom: 20px;">
+                    <img id="menu-ship-img" src="assets/ship.png" alt="Ship" class="floating-ship" style="width: 100px; height: 100px; filter: drop-shadow(0 0 20px #00f2ff);">
+                </div>
                 <h1 class="neon-text">NEBULA</h1>
                 <p class="subtitle">INFINITE DRIFT</p>
                 <div class="best-score" style="margin-bottom: 20px;">BEST SCORE: <span id="best-score-menu">00000</span></div>
@@ -70,6 +73,9 @@
                     <button id="resume-btn" class="glow-btn">RESUME</button>
                 </div>
                 <div class="btn-row" style="margin-top: 10px;">
+                    <button id="pause-settings-btn" class="glow-btn btn-secondary">SETTINGS</button>
+                </div>
+                <div class="btn-row" style="margin-top: 10px;">
                     <button id="quit-btn" class="glow-btn btn-secondary">EXIT TO MENU</button>
                 </div>
             </div>
@@ -84,6 +90,13 @@
                     <div class="toggle-group">
                         <button id="mode-drag" class="toggle-btn active">DRAG</button>
                         <button id="mode-buttons" class="toggle-btn">BUTTONS</button>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <label>SOUND</label>
+                    <div class="toggle-group">
+                        <button id="sound-on" class="toggle-btn active">ON</button>
+                        <button id="sound-off" class="toggle-btn">OFF</button>
                     </div>
                 </div>
                 <button id="close-settings" class="glow-btn">BACK</button>
