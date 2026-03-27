@@ -251,12 +251,34 @@ class EnemyShip extends GameObject {
         this.hp = 2;
         this.startX = x;
         this.lastFireTime = Date.now() + Math.random() * 1000;
+        this.spawnTime = Date.now();
+        this.phase = 'entering';
+        this.targetY = 100 + Math.random() * 80;
     }
     update(speed) {
         if (!this.active) return;
-        this.y += speed * 0.4;
-        this.x = this.startX + Math.sin(this.y * 0.015) * 80;
-        if (this.y > window.innerHeight + 100) this.active = false;
+        const now = Date.now();
+        const fightDuration = 7000;
+        
+        if (this.phase === 'entering') {
+            this.y += speed * 0.7;
+            this.x = this.startX + Math.sin(this.y * 0.05) * 30;
+            if (this.y >= this.targetY) {
+                this.y = this.targetY;
+                this.phase = 'fighting';
+                this.fightStartTime = now;
+            }
+        } else if (this.phase === 'fighting') {
+            this.x = this.startX + Math.sin((now - this.fightStartTime) * 0.003) * 120;
+            if (now - this.fightStartTime > fightDuration) {
+                this.phase = 'leaving';
+                this.fightStartTime = now;
+            }
+        } else if (this.phase === 'leaving') {
+            this.y -= speed * 0.8;
+            this.x = this.startX + Math.sin((now - this.fightStartTime) * 0.003) * 120;
+            if (this.y < -150) this.active = false;
+        }
     }
     draw(ctx) {
         if (!this.active) return;
@@ -265,6 +287,24 @@ class EnemyShip extends GameObject {
         ctx.rotate(Math.PI);
         ctx.shadowBlur = 20; ctx.shadowColor = '#ff004c';
         ctx.drawImage(ASSETS.ship, -40, -40, 80, 80);
+        ctx.restore();
+    }
+}
+
+class SpaceShuttle extends EnemyShip {
+    constructor() { super(); this.radius = 50; }
+    reset(x, y) {
+        super.reset(x, y);
+        this.hp = 10;
+        this.targetY = 70 + Math.random() * 50;
+    }
+    draw(ctx) {
+        if (!this.active) return;
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(Math.PI);
+        ctx.shadowBlur = 30; ctx.shadowColor = '#ff5e00'; // Orange glow
+        ctx.drawImage(ASSETS.ship, -60, -60, 120, 120);
         ctx.restore();
     }
 }
@@ -337,7 +377,8 @@ class GameEngine {
         this.particles = new ParticleSystem();
         this.floatingTexts = Array.from({ length: 20 }, () => new FloatingText());
         this.enemies = Array.from({ length: 5 }, () => new EnemyShip());
-        this.enemyBullets = Array.from({ length: 30 }, () => new EnemyBullet());
+        this.bossEnemies = Array.from({ length: 2 }, () => new SpaceShuttle());
+        this.enemyBullets = Array.from({ length: 40 }, () => new EnemyBullet());
         
         this.score = 0;
         this.gameSpeed = CONFIG.BASE_SPEED;
@@ -400,7 +441,14 @@ class GameEngine {
         document.getElementById('mode-buttons').onclick = () => this.setControlMode('BUTTONS');
 
         // Robust Manual Controls
-        const setMove = (dir, state) => { if (this.controlMode === 'BUTTONS') this.moveState[dir] = state; };
+        const setMove = (dir, state) => { 
+            if (this.controlMode === 'BUTTONS') {
+                this.moveState[dir] = state; 
+                if (this.player) {
+                    this.player.isFiring = (this.moveState.left && this.moveState.right);
+                }
+            } 
+        };
         
         const L = document.getElementById('left-btn');
         const R = document.getElementById('right-btn');
@@ -408,12 +456,41 @@ class GameEngine {
 
         L.onmousedown = L.ontouchstart = (e) => { e.preventDefault(); setMove('left', true); };
         R.onmousedown = R.ontouchstart = (e) => { e.preventDefault(); setMove('right', true); };
-        F.onmousedown = F.ontouchstart = (e) => { e.preventDefault(); if (this.player) this.player.isFiring = true; };
+        F.onmousedown = F.ontouchstart = (e) => { e.preventDefault(); if (this.player && this.controlMode !== 'BUTTONS') this.player.isFiring = true; };
         
-        window.onmouseup = window.ontouchend = window.ontouchcancel = () => {
+        // Improve touch release to not clear everything blindly if multiple touches remain
+        window.onmouseup = window.ontouchcancel = () => {
             this.moveState.left = false;
             this.moveState.right = false;
             if (this.player) this.player.isFiring = false;
+        };
+        
+        window.ontouchend = (e) => {
+            if (e.touches.length === 0) {
+                this.moveState.left = false;
+                this.moveState.right = false;
+                if (this.player) this.player.isFiring = false;
+            } else {
+                // If some touches remain, we assume it's just one direction released
+                // Ideally we track by touch ID, but simple fallback:
+                let lTouched = false; let rTouched = false; let fTouched = false;
+                for(let i=0; i<e.touches.length; i++) {
+                    const t = e.touches[i];
+                    const el = document.elementFromPoint(t.clientX, t.clientY);
+                    if (el === L) lTouched = true;
+                    if (el === R) rTouched = true;
+                    if (el === F) fTouched = true;
+                }
+                this.moveState.left = lTouched;
+                this.moveState.right = rTouched;
+                if (this.player) {
+                    if (this.controlMode === 'BUTTONS') {
+                        this.player.isFiring = (lTouched && rTouched);
+                    } else {
+                        this.player.isFiring = fTouched;
+                    }
+                }
+            }
         };
 
         // Keyboard Support
@@ -441,7 +518,7 @@ class GameEngine {
         
         document.getElementById('hud').classList.toggle('hidden', !showHUD);
         document.getElementById('mobile-controls').classList.toggle('hidden', !isPlaying || this.controlMode === 'DRAG');
-        document.getElementById('action-controls').classList.toggle('hidden', !isPlaying);
+        document.getElementById('action-controls').classList.toggle('hidden', !isPlaying || this.controlMode === 'BUTTONS');
     }
 
     setControlMode(mode) {
@@ -482,6 +559,7 @@ class GameEngine {
         this.powerups.forEach(p => p.active = false);
         this.bullets.forEach(b => b.active = false);
         this.enemies.forEach(e => e.active = false);
+        this.bossEnemies.forEach(e => e.active = false);
         this.enemyBullets.forEach(eb => eb.active = false);
         this.floatingTexts.forEach(ft => ft.active = false);
         this.state = 'PLAYING';
@@ -514,10 +592,13 @@ class GameEngine {
         if (now - this.lastSpawnTime > interval) {
             this.lastSpawnTime = now;
             const rand = Math.random();
-            if (this.score > 5000 && rand < 0.15) {
+            if (this.score > 5000 && rand < 0.05) {
+                const b = this.bossEnemies.find(en => !en.active);
+                if (b) b.reset(Math.random() * (this.canvas.width - 200) + 100, -100);
+            } else if (this.score > 1000 && rand < 0.20) {
                 const e = this.enemies.find(en => !en.active);
                 if (e) e.reset(Math.random() * (this.canvas.width - 200) + 100, -100);
-            } else if (rand < 0.35) {
+            } else if (rand < 0.40) {
                 const pool = this.powerups.find(p => !p.active);
                 if (pool) {
                     const types = ['crystal', 'crystal', 'repair', 'shield', 'turbo', 'ammo'];
@@ -566,31 +647,36 @@ class GameEngine {
             }
         });
 
-        this.enemies.forEach(e => {
-            if (!e.active) return;
-            this.bullets.forEach(b => {
-                if (b.active && distance(b.x, b.y, e.x, e.y) < b.radius + e.radius) {
-                    e.hp--; b.active = false;
-                    this.particles.spawn(b.x, b.y, 10, '#ff004c');
-                    if (e.hp <= 0) {
-                        e.active = false; this.score += 500;
-                        this.particles.spawn(e.x, e.y, 30, '#ff004c');
-                        this.spawnText(e.x, e.y, "+500", "#ff004c");
+        const checkEnemyCollisions = (enemiesArray, scoreReward, pReward, dmg) => {
+            enemiesArray.forEach(e => {
+                if (!e.active) return;
+                this.bullets.forEach(b => {
+                    if (b.active && distance(b.x, b.y, e.x, e.y) < b.radius + e.radius) {
+                        e.hp--; b.active = false;
+                        this.particles.spawn(b.x, b.y, 10, '#ff004c');
+                        if (e.hp <= 0) {
+                            e.active = false; this.score += scoreReward;
+                            this.particles.spawn(e.x, e.y, 30, '#ff004c');
+                            this.spawnText(e.x, e.y, `+${scoreReward}`, "#ff004c");
+                        }
                     }
+                });
+                if (distance(p.x, p.y, e.x, e.y) < p.radius + e.radius) {
+                    e.active = false;
+                    this.particles.spawn(e.x, e.y, 30, '#ff004c');
+                    if (!p.isGhost && !p.isShielded && !p.isTurbo) {
+                        p.hp -= dmg; this.particles.spawn(p.x, p.y, 30, '#ff004c');
+                        this.spawnText(p.x, p.y, `-${dmg} HP`, "#ff004c");
+                        if (p.hp <= 0) this.gameOver();
+                        else { p.isGhost = true; setTimeout(() => p.isGhost = false, 1500); }
+                    } else { this.particles.spawn(p.x, p.y, 10, '#00f2ff'); }
+                    this.updateHUD();
                 }
             });
-            if (distance(p.x, p.y, e.x, e.y) < p.radius + e.radius) {
-                e.active = false;
-                this.particles.spawn(e.x, e.y, 30, '#ff004c');
-                if (!p.isGhost && !p.isShielded && !p.isTurbo) {
-                    this.player.hp -= 40; this.particles.spawn(p.x, p.y, 30, '#ff004c');
-                    this.spawnText(p.x, p.y, "-40 HP", "#ff004c");
-                    if (this.player.hp <= 0) this.gameOver();
-                    else { p.isGhost = true; setTimeout(() => p.isGhost = false, 1500); }
-                } else { this.particles.spawn(p.x, p.y, 10, '#00f2ff'); }
-                this.updateHUD();
-            }
-        });
+        };
+
+        checkEnemyCollisions(this.enemies, 500, "+500", 40);
+        checkEnemyCollisions(this.bossEnemies, 2500, "+2500", 60);
 
         this.enemyBullets.forEach(eb => {
             if (eb.active && distance(p.x, p.y, eb.x, eb.y) < p.radius + eb.radius) {
@@ -660,9 +746,21 @@ class GameEngine {
             this.powerups.forEach(p => p.update(speed));
             this.bullets.forEach(b => { if (b.active) b.update(); });
             
+            this.bossEnemies.forEach(e => {
+                e.update(speed * 0.8);
+                if (e.active && e.phase !== 'leaving' && Date.now() - e.lastFireTime > 800) {
+                    for(let i=-1; i<=1; i++) {
+                        const b = this.enemyBullets.find(eb => !eb.active);
+                        if (b) {
+                            b.reset(e.x + i*30, e.y + e.radius);
+                        }
+                    }
+                    e.lastFireTime = Date.now();
+                }
+            });
             this.enemies.forEach(e => {
                 e.update(speed);
-                if (e.active && Date.now() - e.lastFireTime > 1500) {
+                if (e.active && e.phase !== 'leaving' && Date.now() - e.lastFireTime > 1500) {
                     const b = this.enemyBullets.find(eb => !eb.active);
                     if (b) { b.reset(e.x, e.y + 40); e.lastFireTime = Date.now(); }
                 }
@@ -679,6 +777,7 @@ class GameEngine {
         this.powerups.forEach(p => p.draw(this.ctx));
         this.bullets.forEach(b => b.draw(this.ctx));
         this.enemies.forEach(e => e.draw(this.ctx));
+        this.bossEnemies.forEach(e => e.draw(this.ctx));
         this.enemyBullets.forEach(b => b.draw(this.ctx));
         this.particles.draw(this.ctx);
         this.floatingTexts.forEach(t => t.draw(this.ctx));
