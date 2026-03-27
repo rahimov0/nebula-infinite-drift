@@ -14,6 +14,7 @@ const CONFIG = {
     TURBO_DURATION: 3000,
     SPAWN_INTERVAL: 1000,
     BULLET_SPEED: 12,
+    FIRE_RATE: 150,
     PARALLAX_LAYERS: [
         { count: 30, speedMult: 0.1, size: 1, color: '#ffffff55' },
         { count: 15, speedMult: 0.3, size: 2, color: '#00f2ff33' }
@@ -24,6 +25,7 @@ class AudioEngine {
     constructor() {
         this.ctx = null;
         this.enabled = true;
+        this.bgmEnabled = true;
         this.bgmOsc = null;
         this.bgmGain = null;
         this.thrusterNode = null;
@@ -72,16 +74,64 @@ class AudioEngine {
     playUI() { this.playTone(600, 'sine', 0.05, 0.05); }
 
     startBGM() {
-        if (!this.enabled || !this.ctx) return;
+        if (!this.enabled || !this.bgmEnabled || !this.ctx) return;
         if (this.bgmOsc) return;
         try {
-            this.bgmOsc = this.ctx.createOscillator();
             this.bgmGain = this.ctx.createGain();
-            this.bgmOsc.type = 'sine';
-            this.bgmOsc.frequency.setValueAtTime(60, this.ctx.currentTime);
-            this.bgmGain.gain.setValueAtTime(0.15, this.ctx.currentTime);
-            this.bgmOsc.connect(this.bgmGain);
+            this.bgmGain.gain.setValueAtTime(0.4, this.ctx.currentTime);
             this.bgmGain.connect(this.ctx.destination);
+
+            // Brownian noise generator for space wind
+            const bufferSize = this.ctx.sampleRate * 2;
+            const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            let lastOut = 0;
+            for (let i = 0; i < bufferSize; i++) {
+                const white = Math.random() * 2 - 1;
+                data[i] = (lastOut + (0.02 * white)) / 1.02;
+                lastOut = data[i];
+                data[i] *= 3.5; 
+            }
+            
+            this.noiseSource = this.ctx.createBufferSource();
+            this.noiseSource.buffer = buffer;
+            this.noiseSource.loop = true;
+
+            this.noiseFilter = this.ctx.createBiquadFilter();
+            this.noiseFilter.type = 'lowpass';
+            this.noiseFilter.frequency.value = 100;
+
+            // LFO to make the wind 'move'
+            this.lfo = this.ctx.createOscillator();
+            this.lfo.type = 'sine';
+            this.lfo.frequency.value = 0.05;
+            this.lfoGain = this.ctx.createGain();
+            this.lfoGain.gain.value = 80;
+            this.lfo.connect(this.lfoGain);
+            this.lfoGain.connect(this.noiseFilter.frequency);
+
+            this.noiseSource.connect(this.noiseFilter);
+            this.noiseFilter.connect(this.bgmGain);
+
+            this.noiseSource.start();
+            this.lfo.start();
+            
+            // Subtle deep drone
+            this.bgmOsc = this.ctx.createOscillator();
+            this.bgmOsc.type = 'triangle';
+            this.bgmOsc.frequency.value = 55;
+            
+            this.droneFilter = this.ctx.createBiquadFilter();
+            this.droneFilter.type = 'lowpass';
+            this.droneFilter.frequency.value = 120;
+            
+            this.droneGain = this.ctx.createGain();
+            this.droneGain.gain.value = 0.15;
+            
+            this.bgmOsc.connect(this.droneFilter);
+            this.droneFilter.connect(this.droneGain);
+            this.droneGain.connect(this.bgmGain);
+            
             this.bgmOsc.start();
         } catch(e) {}
     }
@@ -119,11 +169,16 @@ class AudioEngine {
         this.thrusterGain.gain.setTargetAtTime(targetVol, this.ctx.currentTime, 0.1);
     }
 
-    stopBGM() {
-        if (this.bgmOsc) {
-            try { this.bgmOsc.stop(); this.bgmOsc.disconnect(); } catch(e) {}
-            this.bgmOsc = null;
-        }
+    stopOnlyBGM() {
+        const stopNode = (n) => { if (n) { try { n.stop(); n.disconnect(); } catch(e){} } };
+        stopNode(this.bgmOsc); this.bgmOsc = null;
+        stopNode(this.noiseSource); this.noiseSource = null;
+        stopNode(this.lfo); this.lfo = null;
+        if (this.bgmGain) { try { this.bgmGain.disconnect(); } catch(e){} this.bgmGain = null; }
+    }
+
+    stopAllAudio() {
+        this.stopOnlyBGM();
         if (this.thrusterNode) {
             try { this.thrusterNode.stop(); this.thrusterNode.disconnect(); } catch(e) {}
             this.thrusterNode = null;
@@ -530,6 +585,7 @@ class GameEngine {
         this.shakeIntensity = 0;
         this.newRecordReached = false;
         this.shootingStars = Array.from({ length: 5 }, () => new ShootingStar());
+        this.weaponMode = 1;
         this.init();
         this.bindEvents();
     }
@@ -539,15 +595,20 @@ class GameEngine {
         this.createStars();
         for (let i = 0; i < 30; i++) this.asteroids.push(new Asteroid());
         for (let i = 0; i < 15; i++) this.powerups.push(new PowerUp());
-        for (let i = 0; i < 20; i++) this.bullets.push(new Bullet());
+        for (let i = 0; i < 50; i++) this.bullets.push(new Bullet());
         
         loadAssets(() => {
             this.state = 'MENU';
+            document.getElementById('menu-overlay').classList.add('active');
             document.getElementById('start-btn').classList.remove('hidden');
             const menuImg = document.getElementById('menu-ship-img');
             if (menuImg && ASSETS.ship.src) menuImg.src = ASSETS.ship.src;
             this.updateHUD();
             this.updateControlsVisibility();
+            if (!this.loopStarted) { 
+                this.loopStarted = true; 
+                this.gameLoop(); 
+            }
         });
     }
 
@@ -624,8 +685,17 @@ class GameEngine {
         document.getElementById('close-settings').onclick = () => this.showSettings(false);
         document.getElementById('sound-on').onclick = () => { this.setSound(true); audio.playUI(); };
         document.getElementById('sound-off').onclick = () => { this.setSound(false); audio.playUI(); };
+        document.getElementById('bgm-on').onclick = () => { this.setBGM(true); audio.playUI(); };
+        document.getElementById('bgm-off').onclick = () => { this.setBGM(false); audio.playUI(); };
         document.getElementById('mode-drag').onclick = () => this.setControlMode('DRAG');
         document.getElementById('mode-buttons').onclick = () => this.setControlMode('BUTTONS');
+
+        document.getElementById('weapon-toggle').onclick = (e) => {
+            e.stopPropagation();
+            this.weaponMode = this.weaponMode >= 3 ? 1 : this.weaponMode + 1;
+            document.getElementById('weapon-toggle').innerText = this.weaponMode + 'X';
+            audio.playUI();
+        };
 
         // Robust Manual Controls
         const L = document.getElementById('left-btn');
@@ -639,15 +709,12 @@ class GameEngine {
                 const el = document.elementFromPoint(t.clientX, t.clientY);
                 if (el === L || L.contains(el)) l = true;
                 if (el === R || R.contains(el)) r = true;
-                if (el === F || document.getElementById('fire-btn-container').contains(el)) f = true;
+                if (el === F || document.getElementById('action-controls')?.contains(el)) f = true;
             }
             this.moveState.left = l; this.moveState.right = r;
             if (this.player) {
-                if (this.controlMode === 'BUTTONS') {
-                    this.player.isFiring = (l && r);
-                } else {
-                    this.player.isFiring = f;
-                }
+                this.player.isFiring = f || (this.controlMode === 'BUTTONS' && l && r);
+                if (this.player.isFiring) this.shoot();
             }
         };
 
@@ -663,11 +730,11 @@ class GameEngine {
         L.onmousedown = (e) => { e.preventDefault(); this.moveState.left = true; if(this.controlMode==='BUTTONS' && this.moveState.right && this.player) this.player.isFiring=true; };
         L.onmouseup = L.onmouseleave = (e) => { this.moveState.left = false; if(this.controlMode==='BUTTONS' && this.player) this.player.isFiring=false; };
         
-        R.onmousedown = (e) => { e.preventDefault(); this.moveState.right = true; if(this.controlMode==='BUTTONS' && this.moveState.left && this.player) this.player.isFiring=true; };
+        R.onmousedown = (e) => { e.preventDefault(); this.moveState.right = true; if(this.controlMode==='BUTTONS' && this.moveState.left && this.player) { this.player.isFiring=true; this.shoot(); } };
         R.onmouseup = R.onmouseleave = (e) => { this.moveState.right = false; if(this.controlMode==='BUTTONS' && this.player) this.player.isFiring=false; };
         
-        F.onmousedown = (e) => { e.preventDefault(); if (this.controlMode !== 'BUTTONS' && this.player) this.player.isFiring = true; };
-        F.onmouseup = F.onmouseleave = (e) => { if (this.controlMode !== 'BUTTONS' && this.player) this.player.isFiring = false; };
+        F.onmousedown = (e) => { e.preventDefault(); if (this.player) { this.player.isFiring = true; this.shoot(); } };
+        F.onmouseup = F.onmouseleave = (e) => { if (this.player) this.player.isFiring = false; };
 
         window.addEventListener('mouseup', () => {
             this.moveState.left = false; this.moveState.right = false;
@@ -678,7 +745,7 @@ class GameEngine {
         window.addEventListener('keydown', (e) => {
             if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') this.togglePause();
             if (this.state === 'PLAYING') {
-                if (e.code === 'Space') { e.preventDefault(); if (this.player) this.player.isFiring = true; }
+                if (e.code === 'Space') { e.preventDefault(); if (this.player) { this.player.isFiring = true; this.shoot(); } }
                 if (this.controlMode === 'BUTTONS') {
                     if (e.key === 'ArrowLeft') this.moveState.left = true;
                     if (e.key === 'ArrowRight') this.moveState.right = true;
@@ -699,7 +766,7 @@ class GameEngine {
         
         document.getElementById('hud').classList.toggle('hidden', !showHUD);
         document.getElementById('mobile-controls').classList.toggle('hidden', !isPlaying || this.controlMode === 'DRAG');
-        document.getElementById('action-controls').classList.toggle('hidden', !isPlaying || this.controlMode === 'BUTTONS');
+        document.getElementById('action-controls').classList.toggle('hidden', !isPlaying);
     }
 
     setControlMode(mode) {
@@ -715,9 +782,24 @@ class GameEngine {
         document.getElementById('sound-off').classList.toggle('active', !enabled);
         if (enabled) {
             audio.init();
-            if (this.state === 'PLAYING') audio.startBGM();
+            if (this.state === 'PLAYING') {
+                audio.startBGM(); // automatically checks bgmEnabled inside
+                audio.startThruster();
+            }
         } else {
-            audio.stopBGM();
+            audio.stopAllAudio();
+        }
+    }
+
+    setBGM(bgmEnabled) {
+        audio.bgmEnabled = bgmEnabled;
+        document.getElementById('bgm-on').classList.toggle('active', bgmEnabled);
+        document.getElementById('bgm-off').classList.toggle('active', !bgmEnabled);
+        if (bgmEnabled && audio.enabled && this.state === 'PLAYING') {
+            audio.init();
+            audio.startBGM();
+        } else {
+            audio.stopOnlyBGM();
         }
     }
 
@@ -742,18 +824,19 @@ class GameEngine {
             this.state = 'PAUSED';
             document.querySelectorAll('.overlay').forEach(o => o.classList.remove('active'));
             document.getElementById('pause-overlay').classList.add('active');
-            audio.stopBGM();
+            audio.stopAllAudio();
         } else if (this.state === 'PAUSED') {
             this.state = 'PLAYING';
             document.querySelectorAll('.overlay').forEach(o => o.classList.remove('active'));
             audio.startBGM();
+            audio.startThruster();
         }
         this.updateControlsVisibility();
     }
 
     exitToMenu() {
         audio.playUI();
-        audio.stopBGM();
+        audio.stopAllAudio();
         this.state = 'MENU';
         document.querySelectorAll('.overlay').forEach(o => o.classList.remove('active'));
         document.getElementById('menu-overlay').classList.add('active');
@@ -786,7 +869,7 @@ class GameEngine {
     }
 
     gameOver() {
-        audio.stopBGM();
+        audio.stopAllAudio();
         audio.playExplosion();
         this.state = 'GAMEOVER';
         if (this.score > this.highScore) {
@@ -838,22 +921,32 @@ class GameEngine {
 
     shoot() {
         if (this.player.isFiring && Date.now() - this.player.lastFireTime > CONFIG.FIRE_RATE) {
-            const b = this.bullets.find(b => !b.active);
-            if (b) {
-                b.reset(this.player.x, this.player.y - 40);
-                this.player.lastFireTime = Date.now();
-                audio.playShoot();
-                
-                // Triple shot if ammo > 0
-                if (this.player.ammo > 0) {
-                    for(let i of [-1, 1]) {
-                        const sb = this.bullets.find(bl => !bl.active);
-                        if (sb) sb.reset(this.player.x + i*20, this.player.y - 20);
-                    }
-                    this.player.ammo--;
+            let bulletsToFire = Math.min(this.weaponMode, this.player.ammo);
+            if (bulletsToFire > 0) {
+                let positions = [];
+                if (bulletsToFire === 1) {
+                    positions = [ {dx: 0, dy: -40} ];
+                } else if (bulletsToFire === 2) {
+                    positions = [ {dx: -15, dy: -30}, {dx: 15, dy: -30} ];
+                } else if (bulletsToFire === 3) {
+                    positions = [ {dx: 0, dy: -40}, {dx: -20, dy: -20}, {dx: 20, dy: -20} ];
                 }
-                
-                this.updateHUD();
+
+                let actuallyFired = 0;
+                for (let pos of positions) {
+                    const b = this.bullets.find(bl => !bl.active);
+                    if (b) {
+                        b.reset(this.player.x + pos.dx, this.player.y + pos.dy);
+                        actuallyFired++;
+                    }
+                }
+
+                if (actuallyFired > 0) {
+                    this.player.ammo -= actuallyFired;
+                    this.player.lastFireTime = Date.now();
+                    audio.playShoot();
+                    this.updateHUD();
+                }
             }
         }
     }

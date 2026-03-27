@@ -25,6 +25,9 @@ body, html {
     height: 100%;
     overflow: hidden;
     background-color: var(--bg-dark);
+    background-image: url('assets/bg.png');
+    background-size: cover;
+    background-position: center;
     font-family: var(--font-main);
     color: white;
     touch-action: none;

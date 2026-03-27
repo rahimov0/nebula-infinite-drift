@@ -32,6 +32,7 @@
 
             <div class="ammo-display glass neon-text" id="ammo-hud">
                 <span>AMMO:</span> <span id="ammo-count">0</span>
+                <button id="weapon-toggle" class="hud-btn" style="margin-left: 10px; padding: 4px 8px; font-size: 0.8rem; font-weight: bold; width: 40px; color: #ffbd00; border-color: #ffbd00; z-index: 100;">1X</button>
             </div>
 
             <button id="pause-btn" class="hud-btn" style="position: absolute; top: 20px; right: 20px; z-index: 100;">
@@ -47,15 +48,15 @@
 
         <!-- Action Controls -->
         <div id="action-controls" class="hidden">
-            <button id="fire-btn" class="ctrl-btn-action" style="position: absolute; bottom: 40px; right: 30px; font-size: 2rem; width: 80px; height: 80px; border-radius: 50%; z-index: 10;">🔥</button>
+            <button id="fire-btn" class="ctrl-btn-action" style="position: absolute; bottom: 140px; right: 30px; font-size: 2rem; width: 80px; height: 80px; border-radius: 50%; z-index: 10;">🔥</button>
         </div>
 
 
         <!-- Main Menu Overlay -->
-        <div id="menu-overlay" class="overlay active">
+        <div id="menu-overlay" class="overlay">
             <div class="content glass">
                 <div class="menu-hero-image" style="margin-bottom: 20px;">
-                    <img id="menu-ship-img" src="assets/ship.png" alt="Ship" class="floating-ship" style="width: 100px; height: 100px; filter: drop-shadow(0 0 20px #00f2ff);">
+                    <img id="menu-ship-img" src="" alt="Ship" class="floating-ship" style="width: 100px; height: 100px; filter: drop-shadow(0 0 20px #00f2ff);">
                 </div>
                 <h1 class="neon-text">NEBULA</h1>
                 <p class="subtitle">INFINITE DRIFT</p>
@@ -93,10 +94,17 @@
                     </div>
                 </div>
                 <div class="settings-group">
-                    <label>SOUND</label>
+                    <label>GENERAL SOUND</label>
                     <div class="toggle-group">
                         <button id="sound-on" class="toggle-btn active">ON</button>
                         <button id="sound-off" class="toggle-btn">OFF</button>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <label>BACKGROUND MUSIC</label>
+                    <div class="toggle-group">
+                        <button id="bgm-on" class="toggle-btn active">ON</button>
+                        <button id="bgm-off" class="toggle-btn">OFF</button>
                     </div>
                 </div>
                 <button id="close-settings" class="glow-btn">BACK</button>
