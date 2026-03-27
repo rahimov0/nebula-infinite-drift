@@ -245,7 +245,7 @@ class PowerUp extends GameObject {
 }
 
 class EnemyShip extends GameObject {
-    constructor() { super(); this.radius = 35; } 
+    constructor() { super(); this.radius = 35; this.fightDuration = 3500; } 
     reset(x, y) {
         super.reset(x, y);
         this.hp = 2;
@@ -258,7 +258,6 @@ class EnemyShip extends GameObject {
     update(speed) {
         if (!this.active) return;
         const now = Date.now();
-        const fightDuration = 7000;
         
         if (this.phase === 'entering') {
             this.y += speed * 0.7;
@@ -270,7 +269,7 @@ class EnemyShip extends GameObject {
             }
         } else if (this.phase === 'fighting') {
             this.x = this.startX + Math.sin((now - this.fightStartTime) * 0.003) * 120;
-            if (now - this.fightStartTime > fightDuration) {
+            if (now - this.fightStartTime > this.fightDuration) {
                 this.phase = 'leaving';
                 this.fightStartTime = now;
             }
@@ -292,7 +291,7 @@ class EnemyShip extends GameObject {
 }
 
 class SpaceShuttle extends EnemyShip {
-    constructor() { super(); this.radius = 50; }
+    constructor() { super(); this.radius = 50; this.fightDuration = 5000; }
     reset(x, y) {
         super.reset(x, y);
         this.hp = 10;
@@ -332,7 +331,7 @@ class Player {
         this.targetX = this.x;
         this.radius = 25;
         this.hp = CONFIG.MAX_HP;
-        this.ammo = 0;
+        this.ammo = 150;
         this.isGhost = false; this.isShielded = false; this.isTurbo = false;
         this.lastFireTime = 0;
         this.isFiring = false;
@@ -588,20 +587,23 @@ class GameEngine {
 
     spawnEntities() {
         const now = Date.now();
+        let activeBosses = this.bossEnemies.filter(e => e.active).length;
+        let activeEnemies = this.enemies.filter(e => e.active).length;
+
         let interval = CONFIG.SPAWN_INTERVAL / (this.gameSpeed / CONFIG.BASE_SPEED);
         if (now - this.lastSpawnTime > interval) {
             this.lastSpawnTime = now;
             const rand = Math.random();
-            if (this.score > 5000 && rand < 0.05) {
+            if (this.score > 5000 && rand < 0.05 && activeBosses < 1) {
                 const b = this.bossEnemies.find(en => !en.active);
                 if (b) b.reset(Math.random() * (this.canvas.width - 200) + 100, -100);
-            } else if (this.score > 1000 && rand < 0.20) {
+            } else if (this.score > 1000 && rand < 0.20 && activeEnemies < 2 && activeBosses === 0) {
                 const e = this.enemies.find(en => !en.active);
                 if (e) e.reset(Math.random() * (this.canvas.width - 200) + 100, -100);
             } else if (rand < 0.40) {
                 const pool = this.powerups.find(p => !p.active);
                 if (pool) {
-                    const types = ['crystal', 'crystal', 'repair', 'shield', 'turbo', 'ammo'];
+                    const types = ['crystal', 'repair', 'shield', 'turbo', 'ammo', 'ammo', 'ammo'];
                     pool.reset(Math.random() * this.canvas.width, -100, types[Math.floor(Math.random() * types.length)]);
                 }
             } else {
@@ -658,6 +660,12 @@ class GameEngine {
                             e.active = false; this.score += scoreReward;
                             this.particles.spawn(e.x, e.y, 30, '#ff004c');
                             this.spawnText(e.x, e.y, `+${scoreReward}`, "#ff004c");
+                            
+                            // Chance to drop ammo on kill
+                            if (Math.random() < 0.40) {
+                                const pool = this.powerups.find(p => !p.active);
+                                if (pool) pool.reset(e.x, e.y, 'ammo');
+                            }
                         }
                     }
                 });
@@ -695,7 +703,7 @@ class GameEngine {
             if (pu.active && distance(p.x, p.y, pu.x, pu.y) < p.radius + pu.radius) {
                 if (pu.type === 'crystal') { this.score += 100; this.spawnText(pu.x, pu.y, "+100 Puan", '#00f2ff'); }
                 else if (pu.type === 'repair') { p.hp = Math.min(CONFIG.MAX_HP, p.hp + 50); this.spawnText(pu.x, pu.y, "+50 Can", '#00ff88'); }
-                else if (pu.type === 'ammo') { p.ammo += 20; this.spawnText(pu.x, pu.y, "+20 Mermi", '#ff5e00'); }
+                else if (pu.type === 'ammo') { p.ammo += 50; this.spawnText(pu.x, pu.y, "+50 Mermi", '#ff5e00'); }
                 else if (pu.type === 'shield') { p.isShielded = true; setTimeout(() => p.isShielded = false, 5000); this.spawnText(pu.x, pu.y, "Kalkan!", '#ff00ea'); }
                 else if (pu.type === 'turbo') { p.isTurbo = true; setTimeout(() => p.isTurbo = false, 3000); this.spawnText(pu.x, pu.y, "Hız!", '#ffbd00'); }
                 pu.active = false; this.particles.spawn(pu.x, pu.y, 15, '#fff'); this.updateHUD();
