@@ -193,45 +193,7 @@ class FloatingText {
     }
 }
 
-class EnemyShip extends GameObject {
-    constructor() { super(); this.radius = 35; } 
-    reset(x, y) {
-        super.reset(x, y);
-        this.hp = 2;
-        this.startX = x;
-        this.lastFireTime = Date.now() + Math.random() * 1000;
-    }
-    update(speed) {
-        if (!this.active) return;
-        this.y += speed * 0.4;
-        this.x = this.startX + Math.sin(this.y * 0.015) * 80;
-        if (this.y > window.innerHeight + 100) this.active = false;
-    }
-    draw(ctx) {
-        if (!this.active) return;
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.rotate(Math.PI);
-        ctx.shadowBlur = 20; ctx.shadowColor = '#ff004c';
-        ctx.drawImage(ASSETS.ship, -40, -40, 80, 80);
-        ctx.restore();
-    }
-}
 
-class EnemyBullet extends Bullet {
-    update() {
-        this.y += CONFIG.BULLET_SPEED * 0.6;
-        if (this.y > window.innerHeight + 50) this.active = false;
-    }
-    draw(ctx) {
-        if (!this.active) return;
-        ctx.save(); ctx.shadowBlur = 15; ctx.shadowColor = '#ff004c';
-        ctx.translate(this.x, this.y);
-        ctx.rotate(Math.PI);
-        ctx.drawImage(ASSETS.bullet, -15, -15, 30, 30);
-        ctx.restore();
-    }
-}
 
 // --- Entities ---
 class GameObject {
@@ -278,6 +240,46 @@ class PowerUp extends GameObject {
         if (this.type === 'ammo') glow = '#ff5e00';
         ctx.shadowBlur = 20; ctx.shadowColor = glow;
         ctx.drawImage(img, -this.radius, -this.radius, this.radius * 2, this.radius * 2);
+        ctx.restore();
+    }
+}
+
+class EnemyShip extends GameObject {
+    constructor() { super(); this.radius = 35; } 
+    reset(x, y) {
+        super.reset(x, y);
+        this.hp = 2;
+        this.startX = x;
+        this.lastFireTime = Date.now() + Math.random() * 1000;
+    }
+    update(speed) {
+        if (!this.active) return;
+        this.y += speed * 0.4;
+        this.x = this.startX + Math.sin(this.y * 0.015) * 80;
+        if (this.y > window.innerHeight + 100) this.active = false;
+    }
+    draw(ctx) {
+        if (!this.active) return;
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(Math.PI);
+        ctx.shadowBlur = 20; ctx.shadowColor = '#ff004c';
+        ctx.drawImage(ASSETS.ship, -40, -40, 80, 80);
+        ctx.restore();
+    }
+}
+
+class EnemyBullet extends Bullet {
+    update() {
+        this.y += CONFIG.BULLET_SPEED * 0.6;
+        if (this.y > window.innerHeight + 50) this.active = false;
+    }
+    draw(ctx) {
+        if (!this.active) return;
+        ctx.save(); ctx.shadowBlur = 15; ctx.shadowColor = '#ff004c';
+        ctx.translate(this.x, this.y);
+        ctx.rotate(Math.PI);
+        ctx.drawImage(ASSETS.bullet, -15, -15, 30, 30);
         ctx.restore();
     }
 }
