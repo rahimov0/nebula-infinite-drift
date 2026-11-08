@@ -4,14 +4,7 @@
   "start_url": "index.html",
   "display": "fullscreen",
   "orientation": "portrait",
-  "background_color": "#05050a",
-  "theme_color": "#00f2ff",
-  "icons": [
-    {
-      "src": "assets/icon.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
-  ]
+  "background_color": "#05040f",
+  "theme_color": "#05040f",
+  "icons": [{ "src": "assets/icon.png", "sizes": "640x640", "type": "image/png", "purpose": "any maskable" }]
 }

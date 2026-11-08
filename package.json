@@ -1,6 +1,6 @@
 {
   "name": "nebula-infinite-drift",
-  "version": "1.0.0",
+  "version": "3.0.0",
   "description": "High-performance neon space endless runner",
   "main": "index.html",
   "dependencies": {
